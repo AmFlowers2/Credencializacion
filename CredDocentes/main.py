@@ -1,4 +1,4 @@
-import tkinter as tk
+import tkinter as tk, os
 from tkinter import filedialog, messagebox
 from datetime import datetime
 from openpyxl import load_workbook
@@ -10,10 +10,10 @@ borrador_pedido = None
 class App:
     def __init__(self, master):
 
-        print(f"En esta ventanada de texto se mostrarán\nDe haberlos, los errores relacionados con la generación del archivo de credenciales")
+        print(f"En esta ventana se mostrarán los posibles errores\nY advertencias que se encuentren en los datos de los docentes\n")
         self.master = master
         master.title("Preparación de Credenciales de Docentes")
-        master.geometry("450x400")
+        master.geometry("450x500")
         master.configure(bg="#f0f0f0")
 
         titulo = tk.Label(master, text="Preparación de Credenciales Docentes", font=("Segoe UI", 16, "bold"), bg="#f0f0f0")
@@ -28,41 +28,54 @@ class App:
         self.labels_estado = {}
 
         self.crear_apartado("Archivo de Docentes Nuevos", "dfDocentesIntranet", 1)
-        self.crear_apartado("Archivo de Todos", "dfTodos", 2)
-        self.crear_apartado("Carpeta de fotos recibidas", "ruta_fotos", 3)
+        self.crear_apartado("Archivo de Todos", "dfTodos", 3)
+        self.crear_apartado("Carpeta de fotos recibidas", "ruta_fotos", 5)
 
         estilo_boton = {"font": ("Segoe UI", 10), "bg": "#ff6961", "fg": "black", "activebackground": "#45a049"}
 
+        #Boton para procesar los datos
         self.boton_procesar = tk.Button(master, text="Procesar", state=tk.DISABLED, command=self.procesar, **estilo_boton)
-        self.boton_procesar.grid(row=4, column=0, columnspan=3, pady=(35, 20), ipadx=17, ipady=5)
+        self.boton_procesar.grid(row=7, column=0, columnspan=3, pady=(35, 20), ipadx=17, ipady=5)
 
-        self.lbl_estado = tk.Label(master, text="", font=("Segoe UI", 10), bg="#f0f0f0")
-        self.lbl_estado.grid(row=5, column=0, columnspan=3, pady=(5, 10))
+        #Label para mostrar el resultado del procesamiento
+        self.lbl_resultado = tk.Label(master, text="", font=("Segoe UI", 10), bg="#f0f0f0")
+        self.lbl_resultado.grid(row=8, column=0, columnspan=3, pady=(5, 10))
 
+        #Boton para generar el archivo de Excel
         self.btn_generar_excel = tk.Button(master, text="Generar Excel", state=tk.DISABLED, command=self.generar_excel, **estilo_boton)
-        self.btn_generar_excel.grid(row=6, column=0, columnspan=3, pady=(5, 20), ipadx=10, ipady=5)
+        self.btn_generar_excel.grid(row=9, column=0, columnspan=3, pady=(5, 20), ipadx=10, ipady=5)
     
     def crear_apartado(self, texto, clave, fila):
+
+        #Label del tipo de archivo
         label = tk.Label(self.master, text=texto + ":", font=("Segoe UI", 10), bg="#f0f0f0")
         label.grid(row=fila, column=0, sticky="w", padx=20)
 
+        #Botón para seleccionar el archivo o carpeta
         boton = tk.Button(self.master, text="Seleccionar", command=lambda: self.seleccionar_archivo(clave), font=("Segoe UI", 9))
         boton.grid(row=fila, column=1, padx=10)
 
+        #Label para mostrar el estado del archivo o carpeta
         estado = tk.Label(self.master, text="⛔ No cargado", font=("Segoe UI", 9), bg="#f0f0f0", fg="red")
         estado.grid(row=fila, column=2, sticky="w")
 
+        # Label para mostrar solo el nombre del archivo
+        nombre_archivo = tk.Label(self.master, text="", font=("Segoe UI", 8), bg="#f0f0f0", fg="gray")
+        nombre_archivo.grid(row=fila + 1, column=0, columnspan=3, sticky="w", padx=20)
+
         self.labels_estado[clave] = estado
+        self.labels_estado[f"{clave}_nombre"] = nombre_archivo
 
     def seleccionar_archivo(self, clave):
         if clave == "ruta_fotos":
             ruta = filedialog.askdirectory(title="Selecciona la carpeta de fotos")
         else:
             ruta = filedialog.askopenfilename(filetypes=[("Archivos Excel", "*.xlsx")])
-
         if ruta:
             self.archivos_cargados[clave] = ruta
             self.labels_estado[clave].config(text="✅ Archivo cargado", fg="green")
+            nombre_archivo = os.path.basename(ruta)
+            self.labels_estado[f"{clave}_nombre"].config(text=nombre_archivo)
             self.verificar_todo_cargado()
 
     def verificar_todo_cargado(self):
@@ -80,7 +93,7 @@ class App:
 
         if (borrador_pedido is not None) and (len(borrador_pedido) > 1):
             estilo_boton = {"font": ("Segoe UI", 10), "bg": "#00913f", "fg": "white", "activebackground": "#114232", "state": "normal"}
-            self.lbl_estado.config(text=f"Procesamiento completo: \n{len(borrador_pedido)} registros creados", fg="green")
+            self.lbl_resultado.config(text=f"Procesamiento completo: \n{len(borrador_pedido)} registros creados", fg="green")
             self.btn_generar_excel.config(**estilo_boton)
             renombrarFotos(ruta)
         else:
@@ -88,7 +101,7 @@ class App:
 
     def generar_excel(self):
         #Generar el archivo de Excel para hacer el pedido de credenciales
-        fecha = datetime.today().strftime('%Y%m%d') #Obtenemos la fecha del dia de hoy en formato AAAAMMDD
+        fecha = datetime.today().strftime('%Y %m %d') #Obtenemos la fecha del dia de hoy en formato AAAA MM DD
         nombre_excel = f"Pedido DOC {fecha}.xlsx"
 
         archivo_excel = filedialog.asksaveasfilename(

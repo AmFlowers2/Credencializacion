@@ -22,37 +22,22 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
     dfTodos = pd.read_excel(Todos, usecols=["Clave"])
 
     # Alumnos nuevos seran aquellos activos cuya clave no esté en la BD de Todos
-    dfAlumnosNuevos = dfAlumnosIntranet[
-        ~dfAlumnosIntranet["Clave"].isin(dfTodos["Clave"])
-    ]
+    dfAlumnosNuevos = dfAlumnosIntranet[~dfAlumnosIntranet["Clave"].isin(dfTodos["Clave"])]
 
     dfAlumnosNuevos = dfAlumnosNuevos[
-        ~(
-            dfAlumnosNuevos["Carrera"].isin(
-                ["BACHILLERATO TECNOLOGICO DE LA UNIVERSIDAD IUEM", "PREPARATORIA UAEM"]# Alumnos que no sean de prepa
-            )
-        )  
-        & (
-            dfAlumnosNuevos["Plantel"].isin(
-                ["IUEM", "ONLINE", "TENANCINGO", "UNIVERSIDAD IUEM"] # Y que solo sean de estos planteles
-            )
-        )  
+        ~(dfAlumnosNuevos["Carrera"].isin(["BACHILLERATO TECNOLOGICO DE LA UNIVERSIDAD IUEM", "PREPARATORIA UAEM"])) 
+        &
+        (dfAlumnosNuevos["Plantel"].isin(["IUEM", "ONLINE", "TENANCINGO", "UNIVERSIDAD IUEM"]))  
     ]
-
-    # Fotos obtenidas de la oficina de credenciales
-    ruta = rutaFotos  # "Fotos/RecibidasRecientes/"
 
     # Conjunto que contendrá todas las fotos dentro de la carpeta mencionada arriba
     fotos_set = set()
-    for archivo in os.listdir(ruta):  # Por cada archivo que haya en la carpeta ...
-        nombre, ext = os.path.splitext(archivo)  # Obten su nombre y su formato ...
-        if ext.lower() in [".jpg",".jpeg",".png",]:  # Si su formato es un formato de imagen ...
-            fotos_set.add(nombre)  # Añadelo al conjunto de fotos
+    for foto in os.listdir(rutaFotos):
+        nombre, _ = os.path.splitext(foto)
+        fotos_set.add(nombre)  # Añadelo al conjunto de fotos
 
     # Alumnos con fotos seran aquellos cuya clave se encuentre dentro del conjunto de fotos
-    dfAlumnosConFoto = dfAlumnosNuevos[
-        dfAlumnosNuevos["Clave"].astype(str).isin(fotos_set)
-    ]
+    dfAlumnosConFoto = dfAlumnosNuevos[dfAlumnosNuevos["Clave"].astype(str).isin(fotos_set)]
 
     # Verificar que el alumno tenga apellido paterno
     # Verificar que la longitud del nombre sea <= 45 caracteres
@@ -61,34 +46,19 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
             registro["Paterno"] = registro["Materno"]
             registro["Materno"] = ""
         if (len(f"{registro['Paterno']} {registro['Materno']} {registro['Nombre']}") > 45):
-            print(
-                f"El alumno {registro['Paterno']} {registro['Materno']} {registro['Nombre']} tiene un nombre demasiado largo"
-            )
+            print(f"El alumno {registro['Paterno']} {registro['Materno']} {registro['Nombre']} tiene un nombre demasiado largo")
 
     # Todo a mayusculas
-    dfAlumnosConFoto = dfAlumnosConFoto.apply(
-        lambda x: x.map(lambda val: val.upper() if isinstance(val, str) else val)
-    )
+    dfAlumnosConFoto = dfAlumnosConFoto.apply(lambda x: x.map(lambda val: val.upper() if isinstance(val, str) else val))
 
     # Quitar caracteres especiales
     def quitar_caracteres(txt):
-        # re.sub(Caracteres a eliminar, con qué se van a reemplazar, el texto del que se van a eliminar)
-        txt = re.sub(r"[^A-ZÁÉÍÓÚÑ ]", "", txt)  # Pero, al contenter ^, indica que esos caracteres en vez de eliminarse, se van a conservar
-        txt = (
-            txt.replace("Ñ", "N")
-            .replace("Á", "A")
-            .replace("É", "E")
-            .replace("Í", "I")
-            .replace("Ó", "O")
-            .replace("Ú", "U")
-        )
+        txt = re.sub(r"[^A-ZÁÉÍÓÚÑ ]", "", txt)
+        txt = (txt.replace("Ñ", "N").replace("Á", "A").replace("É", "E").replace("Í", "I").replace("Ó", "O").replace("Ú", "U"))
         return txt
 
-    columnas = ["Paterno", "Materno", "Nombre"]
-    for columna in columnas:
-        dfAlumnosConFoto[columna] = dfAlumnosConFoto[columna].apply(
-            lambda x: quitar_caracteres(str(x)) if isinstance(x, str) else x
-        )
+    for columna in ["Paterno", "Materno", "Nombre"]:
+        dfAlumnosConFoto[columna] = dfAlumnosConFoto[columna].apply(lambda x: quitar_caracteres(str(x)) if isinstance(x, str) else x)
 
     # Arreglar el sexo
     dfAlumnosConFoto["Sexo"] = dfAlumnosConFoto["Sexo"].replace({"M": "H", "F": "M"})
@@ -98,30 +68,26 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         fecha_nac = str(registro["Fecha de Nacimiento"])
         rfc = str(registro["RFC"])
 
-        # Si la fecha de nacimiento tiene 8 digitos aaaammdd Y el RFC 10 digitos xxxxAAMMDD ...
-        if (len(fecha_nac) == 8) and (len(rfc) == 10):
+        # Si la fecha de nacimiento NO tiene 8 digitos AAAAMMDD o el RFC NO tiene 10 digitos xxxxAAMMDD ...
+        if (len(fecha_nac) != 8) or (len(rfc) != 10):
+            print("Error en fecha de nacimiento o RFC")  # ... imprime un error
+        else: #Si no...
+            if fecha_nac[2:] != rfc[4:]: #Si la fecha de nacimiento (AAAAMMDD) no coincide con el RFC (xxxxAAMMDD) ...
+                print(f"* Error con el alumno {i}: {registro['Nombre']} {registro['Paterno']} {registro['Materno']}" # Imprime un error
+                    + f"\n\tSu fecha de nacimiento :{fecha_nac} y su RFC: {rfc} no coinciden \n\tPertenece a {registro['Carrera']}")
+                
+                #El RFC tiene prioridad en la fecha de nacimiento
+                if int(rfc[4:6]) <= 25: # Si el mes del RFC es menor o igual a 25, entonces el alumno nació en el siglo XXI
+                    fecha_nac = "20" + rfc[4:]
+                else:
+                    fecha_nac = "19" + rfc[4:] #Si no, entonces el alumno nació en el siglo XX
 
-            # Si fecha de nacimiento a partir de segundo digito en adelante (AAMMDD)
-            # E S   D I S T I N T O
-            # al RFC en su cuarto dígito en adelante (AAMMDD)
-            if fecha_nac[2:] != rfc[4:]:
-                # Imprime un error
-                print(
-                    f"* Error con el alumno {i}: {registro['Nombre']} {registro['Paterno']} {registro['Materno']}"
-                    + f"\n\tSu fecha de nacimiento :{fecha_nac} y su RFC: {rfc} no coinciden \n\tPertenece a {registro['Carrera']}"
-                )
-                # La fecha será arreglada por el RFC
-                fecha_nac = "20" + rfc[4:]
-                # PUEDE HABER ERRORES DE CAPTURA EN EL RFC DESDE LA INTRANET
-                # Por lo que, si la fecha de nacimiento obtenida por el RFC son puros numeros...
-                if fecha_nac.isdigit():
+                if fecha_nac.isdigit(): #Si la fecha de nacimiento contiene solo numeros se puede corregir
                     print(f"LA FECHA CORREGIDA ES {fecha_nac}\n")
-                    dfAlumnosConFoto.at[i, "Fecha de Nacimiento"] = int(fecha_nac)  # ... Corrige la fecha
+                    dfAlumnosConFoto.at[i, "Fecha de Nacimiento"] = int(fecha_nac) #Y Asignar la fecha corregida al DataFrame
                 else:  # Si no son puros numeros, y contiene letras, hay que corregir manualmente los datos del alumno
                     print("EL RFC contiene errores de captura\nVerificar manualmente los datos del alumno\n")
-        else:  # Si la fecha de nacimiento NO tiene 8 digitos Y el rfc no tiene 10 digitos ...
-            print("Error en fecha de nacimiento o RFC")  # ... imprime un error
-
+            
     # Preparar el DataFrame que creará el Excel con el formato solicitado por Santander
     borrador_pedido = pd.DataFrame(
         columns=[
@@ -175,9 +141,9 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
                 baseRoute = sys._MEIPASS
             else:
                 baseRoute = os.path.dirname(__file__)
+            #Archivo donde se especifican los departamentos segun su nombre COMPLETO, el Mapping original tiene abreviaciones
             return os.path.join(baseRoute, "IEUM MAPPING 2024 10 04 OK - copia.xlsx")
-
-        # Archivo donde se especifican los departamentos segun su nombre COMPLETO, el Mapping original tiene abreviaciones
+        
         # Usará la hoja llamada "Departamento"
         mapping = pd.read_excel(getRoute(), sheet_name="Departamento", dtype={"Depto": str})
 
@@ -224,8 +190,8 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         else:  # En cualquier otro caso ...
             condicion = "02"  # El alumno es de licenciatura
 
-        # Y regresa condicion, campus/plantel, departamento
-        return condicion, "04", depto
+        #Y regresa condicion, campus, departamento
+        return condicion, depto
         # Para poder asignarlos a cada registro
 
     # Por caaada registro dentro de dfAlumnosConFoto ...
@@ -241,8 +207,9 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         borrador_pedido.at[i, "MATRICULA"] = valor["Clave"]
 
         # Llamada a la función get_condicion()
-        borrador_pedido.at[i, "CONDICION"], borrador_pedido.at[i, "CAMPUS"],borrador_pedido.at[i, "DEPAR"] = get_condicion(valor["Carrera"])
+        borrador_pedido.at[i, "CONDICION"], borrador_pedido.at[i, "DEPAR"] = get_condicion(valor["Carrera"])
 
+        borrador_pedido.at[i, "CAMPUS"] = "04" # El campus es siempre "04"
         borrador_pedido.at[i, "MOVIMIENTO"] = "A"  # Todos los alumnos de "Alta" se harán en automatico
         borrador_pedido.at[i, "DATO ADICIONAL 1"] = ""
         borrador_pedido.at[i, "DATO ADICIONAL 2"] = ""
@@ -250,8 +217,13 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
 
         if (valor["Nacionalidad"]) != "MEXICANA":  # Si la nacionalidad no es mexicana ...
             print(f"ADVERTENCIA \nEl alumno {valor['Clave']} no es de nacionalidad mexicana, ajustar manualmente")  # Ajustar manualmente
-
-        borrador_pedido.at[i, "Codigo NACIONALIDAD"] = "052"  # Hay que buscar el código de la nacionalidad del alumno en caso de no ser mexicano
+            borrador_pedido.at[i, "Codigo NACIONALIDAD"] = ""  # Dejar en blanco el código de nacionalidad
+            borrador_pedido.at[i, "Nacionalidad"] = ""  # Dejar en blanco la nacionalidad
+            borrador_pedido.at[i, "PAIS"] = ""  # Dejar en blanco el país
+        else:
+            borrador_pedido.at[i, "Codigo NACIONALIDAD"] = "052"
+            borrador_pedido.at[i, "Nacionalidad"] = "MEXICO"
+            borrador_pedido.at[i, "PAIS"] = "052"
 
         # Todos los demas son datos predeterminados
         borrador_pedido.at[i, "TELEFONO"] = "7222624817"
@@ -261,12 +233,10 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         borrador_pedido.at[i, "INTERIOR"] = ""
         borrador_pedido.at[i, "COLONIA"] = "HIPICO"
         borrador_pedido.at[i, "CP"] = "52156"
-        borrador_pedido.at[i, "PAIS"] = "052"
         borrador_pedido.at[i, "POBLACION"] = "METEPEC"
         borrador_pedido.at[i, "ESTADO"] = "0000008MC"
         borrador_pedido.at[i, "COD PROV"] = "00054"
         borrador_pedido.at[i, "DEL/MUN"] = "METEPEC"
-        borrador_pedido.at[i, "Nacionalidad"] = "MEXICO"  # Hay que buscar el pais del alumno en caso de no ser mexicano
         borrador_pedido.at[i, "Pais de residencia"] = "MEXICO"
 
     return borrador_pedido

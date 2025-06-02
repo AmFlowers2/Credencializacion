@@ -1,32 +1,36 @@
-import pandas as pd 
+import pandas as pd
 import re, os
+
+
+def quitar_caracteres(txt): #Quitar caracteres especiales de los nombres
+        txt = re.sub(r'[^A-ZÁÉÍÓÚÑ ]', '', txt)
+        txt = txt.replace('Ñ', 'N').replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U')
+        return txt
 
 def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
     #Verificar qué docentes activos no se encuentran en la BD de Todas las credenciales para poder pedir su credencial
     dfDocentesIntranet = pd.read_excel(ProfesoresNuevos, 
                                     usecols=["appaterno", "apmaterno", "nombre", "clave", "Sexo", "fechanacimiento", "rfc", "Nacionalidad", "Plantel"],
                                     dtype=str)
+    
     dfTodos = pd.read_excel(Todos, usecols=["Clave"])
 
     #Docentes nuevos seran aquellos activos cuya clave no esté en la BD de Todos
     dfDocentesNuevos = dfDocentesIntranet[~dfDocentesIntranet["clave"].isin(dfTodos["Clave"])]
 
-    ruta = rutaFotos #Fotos obtenidas de la oficina de credenciales
-    fotos_set = set() #Conjunto que contendrá todas las fotos dentro de la carpeta mencionada arriba
-    for archivo in os.listdir(ruta): #Por cada archivo que haya en la carpeta ...
-        nombre, ext = os.path.splitext(archivo) #Obten su nombre y su formato ...
-        if ext.lower() in [".jpg", ".jpeg", ".png"]: #Si su formato es un formato de imagen ...
-            if nombre.startswith("C"):                
-                fotos_set.add(nombre) #Añadelo al conjunto de fotos
-            else:
-                fotos_set.add("C"+nombre) #Añadelo al conjunto de fotos
+    fotos_set = set() #Conjunto que contendrá todas las fotos dentro de la carpeta seleccionada
+    for foto in os.listdir(rutaFotos): #Por cada foto dentro de la carpeta
+        nombre, _ = os.path.splitext(foto)
+        if nombre.startswith("C"): #Si el nombre ya empieza con C, no lo cambiamos               
+            fotos_set.add(nombre)
+        else:
+            fotos_set.add("C"+nombre) #Si no, le agregamos una C al inicio del nombre
 
     #Docentes con fotos seran aquellos cuya clave se encuentre dentro del conjunto de fotos
     dfDocentesConFoto = dfDocentesNuevos[dfDocentesNuevos["clave"].astype(str).isin(fotos_set)]
-    #Usaremos dfDocentesConFoto para hacer el pedido
 
     #Verificar que el docente tenga apellido paterno
-    for i, registro in dfDocentesConFoto.iterrows():
+    for _, registro in dfDocentesConFoto.iterrows():
         if not isinstance(registro['appaterno'], str):
             registro['appaterno'] = registro['apmaterno']
             registro['apmaterno'] = ""
@@ -35,18 +39,12 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
 
     #Todo a mayusculas
     dfDocentesConFoto = dfDocentesConFoto.apply(lambda x: x.map(lambda val: val.upper() if isinstance(val, str) else val))
-
-    #Quitar caracteres especiales
-    def quitar_caracteres(txt):
-        txt = re.sub(r'[^A-ZÁÉÍÓÚÑ ]', '', txt)
-        txt = txt.replace('Ñ', 'N').replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U')
-        return txt
-
-    columnas = ["appaterno", "apmaterno", "nombre"]
-    for columna in columnas:
+   
+    #Quitar caracteres especiales de los nombres
+    for columna in ["appaterno", "apmaterno", "nombre"]:
         dfDocentesConFoto[columna] = dfDocentesConFoto[columna].apply(lambda x: quitar_caracteres(str(x)) if isinstance(x, str) else x)
 
-    #Arreglar el sexo
+    #Cambiar el sexo, Masculino a Hombre y Femenino a Mujer
     dfDocentesConFoto["Sexo"] = dfDocentesConFoto["Sexo"].replace({"M" : "H", "F": "M"})
 
     #Verificar fecha de nacimiento igual a RFC
@@ -54,8 +52,10 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
         fecha_nac = str(registro["fechanacimiento"]).replace("-","")[:8]
         rfc = str(registro["rfc"])
 
-        #Si la fecha de nacimiento tiene 8 digitos AAAAMMDD y el RFC 10 digitos xxxxAAMMDD
-        if ((len(fecha_nac) == 8) and (len(rfc) == 13)):
+        #La fecha de nacimiento debe tener 8 digitos (AAAAMMDD) y el RFC 13 (xxxxAAMMDDxxx)
+        if ((len(fecha_nac) != 8) or (len(rfc) != 13)): #Si alguno de los dos no tiene la longitud correcta...
+            print("Error en fecha de nacimiento o RFC")               
+        else:
             #Si fecha de nacimiento a partir de segundo digito en adelante (AAMMDD)
             #E S   D I S T I N T O 
             #al RFC en su cuarto dígito en adelante (AAMMDD)
@@ -70,15 +70,12 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
                 else: #Si no ...
                     fecha_nac = "19" + rfc[4:10] #El docente nación en los 1900's
 
-                #Si dicha fecha se conforma de puros numeros...
+                #La fecha deben contener unicamente números
                 if fecha_nac.isdigit():
                     print(f"LA FECHA CORREGIDA ES {fecha_nac}\n")
-                    #Corrige la fecha
-                    dfDocentesConFoto.at[i, "fechanacimiento"] = int(fecha_nac)
+                    dfDocentesConFoto.at[i, "fechanacimiento"] = int(fecha_nac) #Para poder corregir la fecha de nacimiento
                 else: #Si no, corrigela manunalmente
-                    print("Verificar manualmente los datos del docente\n")                
-        else:
-            print("Error en fecha de nacimiento o RFC")
+                    print("Verificar manualmente los datos del docente\n") 
 
     borrador_pedido = pd.DataFrame(columns=
             ["APELLIDO P", "APELLIDO M", "NOMBRE", "SEXO",
@@ -90,7 +87,7 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
             "COLONIA", "CP", "PAIS", "POBLACION", "ESTADO",
             "COD PROV", "DEL/MUN","Nacionalidad","Pais de residencia"])
         
-        #Por caaada registro dentro de dfDocentesPedido ...
+    #Por caaada registro dentro de dfDocentesConFoto...
     for i, valor in dfDocentesConFoto.iterrows():
         borrador_pedido.at[i, "APELLIDO P"] = valor["appaterno"]
         borrador_pedido.at[i, "APELLIDO M"] = valor["apmaterno"]
@@ -108,10 +105,15 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
         borrador_pedido.at[i, "MODIFICACION EN NOMBRE"] = "NO" #Al ser alta, no requiere cambio de nombre
 
         if (valor["Nacionalidad"]) != "MEXICANA": #Si la nacionalidad no es mexicana ...
-            clave = valor["Clave"]
-            print(f"ADVERTENCIA \nEl docente {clave} no es de nacionalidad mexicana, ajustar manualmente") #Ajustar manualmente
-
-        borrador_pedido.at[i, "Codigo NACIONALIDAD"] = "052"  #Hay que buscar el código de la nacionalidad del docente en caso de no ser mexicano
+            print(f"ADVERTENCIA \nEl docente {valor['Clave']} no es de nacionalidad mexicana, ajustar manualmente") 
+            #Ajustar manualmente los datos de nacionalidad, en el Excel se deja en blanco
+            borrador_pedido.at[i, "Codigo NACIONALIDAD"] = ""
+            borrador_pedido.at[i, "Nacionalidad"] = ""
+            borrador_pedido.at[i, "PAIS"] = ""
+        else:
+            borrador_pedido.at[i, "Codigo NACIONALIDAD"] = "052"
+            borrador_pedido.at[i, "Nacionalidad"] = "MEXICANA"
+            borrador_pedido.at[i, "PAIS"] = "052"
 
         #Todos los demas son datos predeterminados
         borrador_pedido.at[i, "TELEFONO"] = "7222624817"
@@ -121,12 +123,10 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
         borrador_pedido.at[i, "INTERIOR"] = ""
         borrador_pedido.at[i, "COLONIA"] = "HIPICO"
         borrador_pedido.at[i, "CP"] = "52156"
-        borrador_pedido.at[i, "PAIS"] = "052"
         borrador_pedido.at[i, "POBLACION"] = "METEPEC"
         borrador_pedido.at[i, "ESTADO"] = "0000008MC"
         borrador_pedido.at[i, "COD PROV"] = "00054"
-        borrador_pedido.at[i, "DEL/MUN"] = "METEPEC"
-        borrador_pedido.at[i, "Nacionalidad"] = "MEXICANA" #Hay que buscar el pais del alumno en caso de no ser mexicano
+        borrador_pedido.at[i, "DEL/MUN"] = "METEPEC"     
         borrador_pedido.at[i, "Pais de residencia"] = "MEXICO"
 
     return borrador_pedido
