@@ -1,6 +1,5 @@
-import pandas as pd
-import re, os
-
+import pandas as pd, re, os, zipfile
+from PIL import Image
 
 def quitar_caracteres(txt): #Quitar caracteres especiales de los nombres
         txt = re.sub(r'[^A-ZÁÉÍÓÚÑ ]', '', txt)
@@ -131,10 +130,22 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
 
     return borrador_pedido
 
-def renombrarFotos(rutaFotos):
-    for nombre in os.listdir(rutaFotos):
-        origen = os.path.join(rutaFotos, nombre)
-        if os.path.isfile(origen) and not nombre.startswith("C"):
-            nuevo_nombre = "C"+nombre
+def genZip(rutaFotos, fecha):
+
+    rutaRaiz = os.path.dirname(rutaFotos)
+    zipName = os.path.join(rutaRaiz, f"Pedido DOC {fecha}.zip")
+
+    for foto in os.listdir(rutaFotos):
+        origen = os.path.join(rutaFotos, foto)
+        if os.path.isfile(origen) and not foto.startswith("C"):
+            nuevo_nombre = "C"+foto
             destino = os.path.join(rutaFotos, nuevo_nombre)
             os.rename(origen, destino)
+
+            imgRedimensionada = Image.open(destino).resize((182,230))
+            imgRedimensionada.save(destino, "JPEG")
+
+    with zipfile.Zipfile(zipName, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+        for foto in os.listdir(rutaFotos):
+            zipf.write(os.path.join(rutaFotos, foto), foto)
+        

@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
-from procesamiento import procesarDatosDocentes,renombrarFotos
+from procesamiento import procesarDatosDocentes,genZip
 
 borrador_pedido = None
 
@@ -104,6 +104,9 @@ class App:
         fecha = datetime.today().strftime('%Y %m %d') #Obtenemos la fecha del dia de hoy en formato AAAA MM DD
         nombre_excel = f"Pedido DOC {fecha}.xlsx"
 
+
+        genZip(self.archivos_cargados["ruta_fotos"], fecha)
+        
         archivo_excel = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],

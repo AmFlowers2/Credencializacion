@@ -1,6 +1,5 @@
-import pandas as pd
-import re, os, sys
-
+import re, os, sys, zipfile, pandas as pd
+from PIL import Image
 
 def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
 
@@ -240,3 +239,20 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         borrador_pedido.at[i, "Pais de residencia"] = "MEXICO"
 
     return borrador_pedido
+
+# Genera un zip con las fotos redimensionadas y las guarda en la ruta especificada
+def genZip(rutaFotos, fecha):
+
+    rutaRaiz = os.path.dirname(rutaFotos)
+    zipName = os.path.join(rutaRaiz,f"Pedido A {fecha}.zip")
+
+    for foto in os.listdir(rutaFotos):
+        if foto.lower().endswith(".jpg"):
+            rutaImg = os.path.join(rutaFotos, foto)
+            img_redimensionada = Image.open(rutaImg).resize((182, 230))
+            img_redimensionada.save(rutaImg, "JPEG") 
+
+    with zipfile.ZipFile(zipName, 'w', compression= zipfile.ZIP_DEFLATED) as zipf:
+        for foto in os.listdir(rutaFotos):
+            rutaFoto = os.path.join(rutaFotos, foto)
+            zipf.write(rutaFoto, foto)

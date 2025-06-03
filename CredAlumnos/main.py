@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 from datetime import datetime
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
-from preparacion import ProcesarArchivos
+from preparacion import ProcesarArchivos, genZip
 
 borrador_pedido = None
 
@@ -125,6 +125,8 @@ class App:
         # Generar el archivo de Excel para hacer el pedido de credenciales
         fecha = datetime.today().strftime("%Y %m %d")  # Obtenemos la fecha del dia de hoy en formato AAAAMMDD
         nombre_excel = f"Pedido A {fecha}.xlsx"
+
+        genZip(self.archivos_cargados["ruta_fotos"], fecha)
 
         archivo_excel = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
