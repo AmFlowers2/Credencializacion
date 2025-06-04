@@ -240,19 +240,16 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
 
     return borrador_pedido
 
-# Genera un zip con las fotos redimensionadas y las guarda en la ruta especificada
+# Genera un zip con las fotos redimensionadas EN 182x230px y las guarda en la misma ruta que la carpeta de fotos
 def genZip(rutaFotos, fecha):
 
     rutaRaiz = os.path.dirname(rutaFotos)
     zipName = os.path.join(rutaRaiz,f"Pedido A {fecha}.zip")
 
-    for foto in os.listdir(rutaFotos):
-        if foto.lower().endswith(".jpg"):
-            rutaImg = os.path.join(rutaFotos, foto)
-            img_redimensionada = Image.open(rutaImg).resize((182, 230))
-            img_redimensionada.save(rutaImg, "JPEG") 
-
     with zipfile.ZipFile(zipName, 'w', compression= zipfile.ZIP_DEFLATED) as zipf:
         for foto in os.listdir(rutaFotos):
-            rutaFoto = os.path.join(rutaFotos, foto)
-            zipf.write(rutaFoto, foto)
+            if foto.lower().endswith(".jpg"):
+                rutaImg = os.path.join(rutaFotos, foto)
+                img_redimensionada = Image.open(rutaImg).resize((182, 230))
+                img_redimensionada.save(rutaImg, "JPEG")
+                zipf.write(rutaImg, foto)

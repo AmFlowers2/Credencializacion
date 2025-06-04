@@ -95,7 +95,6 @@ class App:
             estilo_boton = {"font": ("Segoe UI", 10), "bg": "#00913f", "fg": "white", "activebackground": "#114232", "state": "normal"}
             self.lbl_resultado.config(text=f"Procesamiento completo: \n{len(borrador_pedido)} registros creados", fg="green")
             self.btn_generar_excel.config(**estilo_boton)
-            renombrarFotos(ruta)
         else:
             messagebox.showerror("Error", "No se generó ningún resultado.")
 
@@ -103,7 +102,6 @@ class App:
         #Generar el archivo de Excel para hacer el pedido de credenciales
         fecha = datetime.today().strftime('%Y %m %d') #Obtenemos la fecha del dia de hoy en formato AAAA MM DD
         nombre_excel = f"Pedido DOC {fecha}.xlsx"
-
 
         genZip(self.archivos_cargados["ruta_fotos"], fecha)
         

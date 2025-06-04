@@ -130,22 +130,22 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
 
     return borrador_pedido
 
-def genZip(rutaFotos, fecha):
+def genZip(rutaFotos, fecha): #C/Users/Abraham/Desktop/Docentes , 2025 06 04
 
-    rutaRaiz = os.path.dirname(rutaFotos)
-    zipName = os.path.join(rutaRaiz, f"Pedido DOC {fecha}.zip")
+    rutaRaiz = os.path.dirname(rutaFotos) #C/Users/Abraham/Desktop
+    zipName = os.path.join(rutaRaiz, f"Pedido DOC {fecha}.zip") #C/Users/Abraham/Desktop/Pedido DOC 2025 06 04.zip
 
-    for foto in os.listdir(rutaFotos):
-        origen = os.path.join(rutaFotos, foto)
-        if os.path.isfile(origen) and not foto.startswith("C"):
-            nuevo_nombre = "C"+foto
-            destino = os.path.join(rutaFotos, nuevo_nombre)
-            os.rename(origen, destino)
-
-            imgRedimensionada = Image.open(destino).resize((182,230))
-            imgRedimensionada.save(destino, "JPEG")
-
-    with zipfile.Zipfile(zipName, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+    with zipfile.ZipFile(zipName, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
         for foto in os.listdir(rutaFotos):
-            zipf.write(os.path.join(rutaFotos, foto), foto)
-        
+            if foto.lower().endswith(".jpg"):
+                nombreOriginal = os.path.join(rutaFotos, foto)
+                if not foto.startswith("C"):
+                    nombreNuevo = os.path.join(rutaFotos, "C"+foto)
+                    os.rename(nombreOriginal, nombreNuevo)
+                    imgRedimensionada = Image.open(nombreNuevo).resize((182,230))
+                    imgRedimensionada.save(nombreNuevo, "JPEG")
+                    zipf.write(nombreNuevo, "C"+foto) 
+                else:
+                    imgRedimensionada = Image.open(nombreOriginal).resize((182,230))
+                    imgRedimensionada.save(nombreOriginal, "JPEG")
+                    zipf.write(nombreOriginal, foto)
