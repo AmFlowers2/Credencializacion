@@ -75,7 +75,7 @@ class App:
             self.archivos_cargados[clave] = ruta
             self.labels_estado[clave].config(text="✅ Archivo cargado", fg="green")
             nombre_archivo = os.path.basename(ruta)
-            self.labels_estado[f"{clave}_nombre"].config(text=nombre_archivo)
+            self.labels_estado[f"{clave}_nombre"].config(text=f"Has seleccionado: {nombre_archivo}")
             self.verificar_todo_cargado()
 
     def verificar_todo_cargado(self):
@@ -87,7 +87,7 @@ class App:
         dfDocentesIntranet_path = self.archivos_cargados["dfDocentesIntranet"]
         dfTodos_path = self.archivos_cargados["dfTodos"]
         ruta = self.archivos_cargados["ruta_fotos"]
-        print(ruta)
+
         global borrador_pedido
         borrador_pedido = procesarDatosDocentes(dfDocentesIntranet_path, dfTodos_path, ruta)
 
@@ -102,8 +102,6 @@ class App:
         #Generar el archivo de Excel para hacer el pedido de credenciales
         fecha = datetime.today().strftime('%Y %m %d') #Obtenemos la fecha del dia de hoy en formato AAAA MM DD
         nombre_excel = f"Pedido DOC {fecha}.xlsx"
-
-        genZip(self.archivos_cargados["ruta_fotos"], fecha)
         
         archivo_excel = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
@@ -113,6 +111,9 @@ class App:
         )
 
         if archivo_excel:
+            
+            genZip(self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) #Genera el zip con las fotos redimensionadas
+
             #Convertir el borrado en un excel
             borrador_pedido.to_excel(archivo_excel,index=False, engine="openpyxl")
 

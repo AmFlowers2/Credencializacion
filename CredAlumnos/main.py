@@ -12,7 +12,7 @@ class App:
     def __init__(self, master):
 
         print(f"En esta ventanada de texto se mostrarán, de haberlos\n"+
-              f"Los errores relacionados con la generación del archivo de credenciales")
+              f"Los errores o advertencias relacionadas con la generación del archivo de credenciales")
         
         self.master = master
         master.title("Preparación de Credenciales")
@@ -83,7 +83,7 @@ class App:
             self.archivos_cargados[clave] = ruta
             self.labels_estado[clave].config(text="✅ Archivo cargado", fg="green")
             nombre_archivo = os.path.basename(ruta)
-            self.labels_estado[f"{clave}_nombre"].config(text=nombre_archivo)
+            self.labels_estado[f"{clave}_nombre"].config(text=f"Has seleccionado: {nombre_archivo}")
             self.verificar_todo_cargado()
 
     def verificar_todo_cargado(self):

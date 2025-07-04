@@ -1,6 +1,8 @@
 import pandas as pd, re, os, zipfile
 from PIL import Image
 
+fotos_set = set()
+
 def quitar_caracteres(txt): #Quitar caracteres especiales de los nombres
         txt = re.sub(r'[^A-ZÁÉÍÓÚÑ ]', '', txt)
         txt = txt.replace('Ñ', 'N').replace('Á', 'A').replace('É', 'E').replace('Í', 'I').replace('Ó', 'O').replace('Ú', 'U')
@@ -17,7 +19,8 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
     #Docentes nuevos seran aquellos activos cuya clave no esté en la BD de Todos
     dfDocentesNuevos = dfDocentesIntranet[~dfDocentesIntranet["clave"].isin(dfTodos["Clave"])]
 
-    fotos_set = set() #Conjunto que contendrá todas las fotos dentro de la carpeta seleccionada
+    #fotos_set = set() #Conjunto que contendrá todas las fotos dentro de la carpeta seleccionada
+    global fotos_set
     for foto in os.listdir(rutaFotos): #Por cada foto dentro de la carpeta
         nombre, _ = os.path.splitext(foto)
         if nombre.startswith("C"): #Si el nombre ya empieza con C, no lo cambiamos               
@@ -130,22 +133,31 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
 
     return borrador_pedido
 
-def genZip(rutaFotos, fecha): #C/Users/Abraham/Desktop/Docentes , 2025 06 04
+def genZip(rutaFotos, fecha, borrador_pedido): #C/Users/Abraham/Desktop/Docentes , 2025 06 04
 
     rutaRaiz = os.path.dirname(rutaFotos) #C/Users/Abraham/Desktop
     zipName = os.path.join(rutaRaiz, f"Pedido DOC {fecha}.zip") #C/Users/Abraham/Desktop/Pedido DOC 2025 06 04.zip
+    fotosValidas = fotos_set & set(borrador_pedido["MATRICULA"].astype(str))
+
 
     with zipfile.ZipFile(zipName, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
         for foto in os.listdir(rutaFotos):
             if foto.lower().endswith(".jpg"):
                 nombreOriginal = os.path.join(rutaFotos, foto)
+                nombreSinExt, _ = os.path.splitext(foto)
                 if not foto.startswith("C"):
                     nombreNuevo = os.path.join(rutaFotos, "C"+foto)
                     os.rename(nombreOriginal, nombreNuevo)
                     imgRedimensionada = Image.open(nombreNuevo).resize((182,230))
                     imgRedimensionada.save(nombreNuevo, "JPEG")
-                    zipf.write(nombreNuevo, "C"+foto) 
+                    if "C"+nombreSinExt in fotosValidas:
+                        zipf.write(nombreNuevo, "C"+foto) 
+                    else:
+                        print(f"La foto {foto} no se incluyó en el zip.")
                 else:
                     imgRedimensionada = Image.open(nombreOriginal).resize((182,230))
                     imgRedimensionada.save(nombreOriginal, "JPEG")
-                    zipf.write(nombreOriginal, foto)
+                    if nombreSinExt in fotosValidas:
+                        zipf.write(nombreOriginal, foto)
+                    else:
+                        print(f"La foto {foto} no se incluyó en el zip.")

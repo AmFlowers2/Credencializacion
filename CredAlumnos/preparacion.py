@@ -252,9 +252,12 @@ def genZip(rutaFotos, fecha, borrador_pedido):
 
     with zipfile.ZipFile(zipName, 'w', compression= zipfile.ZIP_DEFLATED) as zipf:
         for foto in os.listdir(rutaFotos):
-            nombreFoto, _ = os.path.splitext(foto)
-            rutaImg = os.path.join(rutaFotos, foto)
-            img_redimensionada = Image.open(rutaImg).resize((182, 230))
-            img_redimensionada.save(rutaImg, "JPEG")
-            if foto.lower().endswith(".jpg") and nombreFoto in fotosValidas:
-                zipf.write(rutaImg, foto)
+            if foto.lower().endswith(".jpg"):
+                nombreFoto, _ = os.path.splitext(foto)
+                rutaImg = os.path.join(rutaFotos, foto)
+                img_redimensionada = Image.open(rutaImg).resize((182, 230))
+                img_redimensionada.save(rutaImg, "JPEG")
+                if nombreFoto in fotosValidas:
+                    zipf.write(rutaImg, foto)
+                else:
+                    print(f"La foto {foto} no se incluyó en el zip.")
