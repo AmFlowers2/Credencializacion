@@ -126,8 +126,6 @@ class App:
         fecha = datetime.today().strftime("%Y %m %d")  # Obtenemos la fecha del dia de hoy en formato AAAAMMDD
         nombre_excel = f"Pedido A {fecha}.xlsx"
 
-        genZip(self.archivos_cargados["ruta_fotos"], fecha)
-
         archivo_excel = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],
@@ -136,6 +134,9 @@ class App:
         )
 
         if archivo_excel:
+            
+            genZip(self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) # Generar el zip con las fotos redimensionadas
+
             # Convertir el borrador en un excel
             borrador_pedido.to_excel(archivo_excel, index=False, engine="openpyxl")
             wb = load_workbook(archivo_excel)

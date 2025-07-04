@@ -1,6 +1,8 @@
 import re, os, sys, zipfile, pandas as pd
 from PIL import Image
 
+fotos_set = set()
+
 def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
 
     dfAlumnosIntranet = pd.read_excel(
@@ -30,7 +32,8 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
     ]
 
     # Conjunto que contendrá todas las fotos dentro de la carpeta mencionada arriba
-    fotos_set = set()
+    #fotos_set = set()
+    global fotos_set
     for foto in os.listdir(rutaFotos):
         nombre, _ = os.path.splitext(foto)
         fotos_set.add(nombre)  # Añadelo al conjunto de fotos
@@ -241,15 +244,17 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
     return borrador_pedido
 
 # Genera un zip con las fotos redimensionadas EN 182x230px y las guarda en la misma ruta que la carpeta de fotos
-def genZip(rutaFotos, fecha):
+def genZip(rutaFotos, fecha, borrador_pedido):
 
     rutaRaiz = os.path.dirname(rutaFotos)
     zipName = os.path.join(rutaRaiz,f"Pedido A {fecha}.zip")
+    fotosValidas = fotos_set & set(borrador_pedido["MATRICULA"].astype(str))
 
     with zipfile.ZipFile(zipName, 'w', compression= zipfile.ZIP_DEFLATED) as zipf:
         for foto in os.listdir(rutaFotos):
-            if foto.lower().endswith(".jpg"):
-                rutaImg = os.path.join(rutaFotos, foto)
-                img_redimensionada = Image.open(rutaImg).resize((182, 230))
-                img_redimensionada.save(rutaImg, "JPEG")
+            nombreFoto, _ = os.path.splitext(foto)
+            rutaImg = os.path.join(rutaFotos, foto)
+            img_redimensionada = Image.open(rutaImg).resize((182, 230))
+            img_redimensionada.save(rutaImg, "JPEG")
+            if foto.lower().endswith(".jpg") and nombreFoto in fotosValidas:
                 zipf.write(rutaImg, foto)
