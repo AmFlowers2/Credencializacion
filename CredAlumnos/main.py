@@ -135,7 +135,7 @@ class App:
 
         if archivo_excel:
             
-            genZip(self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) # Generar el zip con las fotos redimensionadas
+            genZip(archivo_excel, self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) # Generar el zip con las fotos redimensionadas
 
             # Convertir el borrador en un excel
             borrador_pedido.to_excel(archivo_excel, index=False, engine="openpyxl")
@@ -175,7 +175,7 @@ class App:
             # Guardar cambios y generar el Excel
             wb.save(archivo_excel)
 
-            messagebox.showinfo("Éxito", "Archivo guardado correctamente")
+            messagebox.showinfo("Éxito", "Archivo Excel guardado correctamente.\n\nEl archivo .zip con las fotos \nse ha guardado en el mismo lugar.")
         else:
             messagebox.showwarning("Advertencia", "No has guardado el archivo")
 

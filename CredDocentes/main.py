@@ -91,7 +91,7 @@ class App:
         global borrador_pedido
         borrador_pedido = procesarDatosDocentes(dfDocentesIntranet_path, dfTodos_path, ruta)
 
-        if (borrador_pedido is not None) and (len(borrador_pedido) > 1):
+        if (borrador_pedido is not None) and (len(borrador_pedido) >= 1):
             estilo_boton = {"font": ("Segoe UI", 10), "bg": "#00913f", "fg": "white", "activebackground": "#114232", "state": "normal"}
             self.lbl_resultado.config(text=f"Procesamiento completo: \n{len(borrador_pedido)} registros creados", fg="green")
             self.btn_generar_excel.config(**estilo_boton)
@@ -109,10 +109,11 @@ class App:
             initialfile=nombre_excel,
             title="Guardar archivo como ..."
         )
-
+        #print(archivo_excel)
         if archivo_excel:
             
-            genZip(self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) #Genera el zip con las fotos redimensionadas
+            #genZip(self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) #Genera el zip con las fotos redimensionadas
+            genZip(archivo_excel, self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) #Genera el zip con las fotos redimensionadas
 
             #Convertir el borrado en un excel
             borrador_pedido.to_excel(archivo_excel,index=False, engine="openpyxl")
@@ -147,7 +148,7 @@ class App:
                 ws.column_dimensions[column_letter].width = max_length + 2
             # Guardar cambios y geberar el Excel
             wb.save(archivo_excel)
-            messagebox.showinfo("Éxito", "Archivo guardado correctamente")
+            messagebox.showinfo("Éxito", "Archivo Excel guardado correctamente.\n\nEl archivo .zip con las fotos \nse ha guardado en el mismo lugar.")
         else:
             messagebox.showwarning("Advertencia", "No has guardado el archivo")
 

@@ -133,31 +133,27 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
 
     return borrador_pedido
 
-def genZip(rutaFotos, fecha, borrador_pedido): #C/Users/Abraham/Desktop/Docentes , 2025 06 04
+def genZip(rutaExcel, rutaFotos, fecha, borrador_pedido):
 
-    rutaRaiz = os.path.dirname(rutaFotos) #C/Users/Abraham/Desktop
-    zipName = os.path.join(rutaRaiz, f"Pedido DOC {fecha}.zip") #C/Users/Abraham/Desktop/Pedido DOC 2025 06 04.zip
+    zipName = os.path.join(os.path.dirname(rutaExcel), f"Pedido DOC {fecha}.zip")
     fotosValidas = fotos_set & set(borrador_pedido["MATRICULA"].astype(str))
-
-
+    
     with zipfile.ZipFile(zipName, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
-        for foto in os.listdir(rutaFotos):
-            if foto.lower().endswith(".jpg"):
-                nombreOriginal = os.path.join(rutaFotos, foto)
-                nombreSinExt, _ = os.path.splitext(foto)
-                if not foto.startswith("C"):
-                    nombreNuevo = os.path.join(rutaFotos, "C"+foto)
-                    os.rename(nombreOriginal, nombreNuevo)
-                    imgRedimensionada = Image.open(nombreNuevo).resize((182,230))
-                    imgRedimensionada.save(nombreNuevo, "JPEG")
-                    if "C"+nombreSinExt in fotosValidas:
-                        zipf.write(nombreNuevo, "C"+foto) 
-                    else:
-                        print(f"La foto {foto} no se incluyó en el zip.")
-                else:
-                    imgRedimensionada = Image.open(nombreOriginal).resize((182,230))
-                    imgRedimensionada.save(nombreOriginal, "JPEG")
-                    if nombreSinExt in fotosValidas:
-                        zipf.write(nombreOriginal, foto)
-                    else:
-                        print(f"La foto {foto} no se incluyó en el zip.")
+        for foto in os.listdir(rutaFotos): #Por cada archivo (expected foto) en la carpeta seleccionada...
+            if not foto.lower().endswith(".jpg"): #Si no es una imagen ...
+                continue                          # continua con el siguiente archivo
+
+            if not foto.startswith("C"): #Si la foto NO empieza con C
+                nuevo_nombre = "C" + foto 
+                              #Cambia el nombre antiguo, por el nombre nuevo
+                os.rename(os.path.join(rutaFotos, foto), os.path.join(rutaFotos, nuevo_nombre))
+                foto = nuevo_nombre #Actuliaza el valor de la variable
+
+            ruta = os.path.join(rutaFotos, foto)
+            Image.open(ruta).resize((182, 230)).save(ruta, "JPEG") #Abre, redimensiona y guarda la imagen 
+
+            nombre_sin_ext = os.path.splitext(foto)[0] #Usa Cxxxxxx en vez de Cxxxxxx.jpg 
+            if nombre_sin_ext in fotosValidas:
+                zipf.write(ruta, foto)
+            else:
+                print(f"La foto {foto} no se incluyó en el zip.")

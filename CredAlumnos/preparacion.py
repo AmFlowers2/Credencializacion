@@ -244,20 +244,17 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
     return borrador_pedido
 
 # Genera un zip con las fotos redimensionadas EN 182x230px y las guarda en la misma ruta que la carpeta de fotos
-def genZip(rutaFotos, fecha, borrador_pedido):
+def genZip(rutaExcel, rutaFotos, fecha, borrador_pedido):
 
-    rutaRaiz = os.path.dirname(rutaFotos)
-    zipName = os.path.join(rutaRaiz,f"Pedido A {fecha}.zip")
+    zipName = os.path.join(os.path.dirname(rutaExcel),f"Pedido A {fecha}.zip")
     fotosValidas = fotos_set & set(borrador_pedido["MATRICULA"].astype(str))
 
     with zipfile.ZipFile(zipName, 'w', compression= zipfile.ZIP_DEFLATED) as zipf:
         for foto in os.listdir(rutaFotos):
             if foto.lower().endswith(".jpg"):
-                nombreFoto, _ = os.path.splitext(foto)
                 rutaImg = os.path.join(rutaFotos, foto)
-                img_redimensionada = Image.open(rutaImg).resize((182, 230))
-                img_redimensionada.save(rutaImg, "JPEG")
-                if nombreFoto in fotosValidas:
+                Image.open(rutaImg).resize((182, 230)).save(rutaImg, "JPEG")
+                if os.path.splitext(foto)[0] in fotosValidas:
                     zipf.write(rutaImg, foto)
                 else:
                     print(f"La foto {foto} no se incluyó en el zip.")
