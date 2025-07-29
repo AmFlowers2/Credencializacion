@@ -105,7 +105,7 @@ class App:
         global borrador_pedido
         borrador_pedido = ProcesarArchivos(dfAlumnosIntranet_path, dfTodos_path, ruta)
 
-        if (borrador_pedido is not None) and (len(borrador_pedido) > 1):
+        if (borrador_pedido is not None) and (len(borrador_pedido) >= 1):
             self.lbl_estado.config(
                 text=f"Procesamiento completo \n{len(borrador_pedido)} registros creados",
                 fg="green",
