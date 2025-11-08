@@ -1,4 +1,4 @@
-('C:\\Users\\Abraham\\Desktop\\Cosas '
+('C:\\Users\\Abraham\\Cosas '
  'cosas\\Proy_Credenciales\\CredAlumnos\\build\\main\\PYZ-00.pyz',
  [('IPython',
    'C:\\Users\\Abraham\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\IPython\\__init__.py',
@@ -4616,7 +4616,7 @@
    'C:\\Users\\Abraham\\AppData\\Local\\Programs\\Python\\Python310\\lib\\pprint.py',
    'PYMODULE'),
   ('preparacion',
-   'C:\\Users\\Abraham\\Desktop\\Cosas '
+   'C:\\Users\\Abraham\\Cosas '
    'cosas\\Proy_Credenciales\\CredAlumnos\\preparacion.py',
    'PYMODULE'),
   ('profile',

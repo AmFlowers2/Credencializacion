@@ -26,7 +26,7 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
     dfAlumnosNuevos = dfAlumnosIntranet[~dfAlumnosIntranet["Clave"].isin(dfTodos["Clave"])]
 
     dfAlumnosNuevos = dfAlumnosNuevos[
-        ~(dfAlumnosNuevos["Carrera"].isin(["BACHILLERATO TECNOLOGICO DE LA UNIVERSIDAD IUEM", "PREPARATORIA UAEM"])) 
+        ~(dfAlumnosNuevos["Carrera"].isin(["BACHILLERATO TECNOLOGICO DE LA UNIVERSIDAD IUEM", "PREPARATORIA UAEM", "PREPARATORIA SE"])) 
         &
         (dfAlumnosNuevos["Plantel"].isin(["IUEM", "ONLINE", "TENANCINGO", "UNIVERSIDAD IUEM"]))  
     ]
