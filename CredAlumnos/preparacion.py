@@ -1,49 +1,13 @@
-import re, os, sys, zipfile, pandas as pd
+import re, os, sys, zipfile, pandas as pd, pdfplumber, numpy as np
 from PIL import Image
 
 fotos_set = set()
-
-def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
-
-    dfAlumnosIntranet = pd.read_excel(
-        AlumnosActivos,
-        usecols=[
-            "Paterno",
-            "Materno",
-            "Nombre",
-            "Clave",
-            "Sexo",
-            "Fecha de Nacimiento",
-            "RFC",
-            "Carrera",
-            "Nacionalidad",
-            "Plantel",
-        ],
-    )
-    dfTodos = pd.read_excel(Todos, usecols=["Clave"])
-
-    # Alumnos nuevos seran aquellos activos cuya clave no esté en la BD de Todos
-    dfAlumnosNuevos = dfAlumnosIntranet[~dfAlumnosIntranet["Clave"].isin(dfTodos["Clave"])]
-
-    dfAlumnosNuevos = dfAlumnosNuevos[
-        ~(dfAlumnosNuevos["Carrera"].isin(["BACHILLERATO TECNOLOGICO DE LA UNIVERSIDAD IUEM", "PREPARATORIA UAEM", "PREPARATORIA SE"])) 
-        &
-        (dfAlumnosNuevos["Plantel"].isin(["IUEM", "ONLINE", "TENANCINGO", "UNIVERSIDAD IUEM"]))  
-    ]
-
-    # Conjunto que contendrá todas las fotos dentro de la carpeta mencionada arriba
-    #fotos_set = set()
-    global fotos_set
-    for foto in os.listdir(rutaFotos):
-        nombre, _ = os.path.splitext(foto)
-        fotos_set.add(nombre)  # Añadelo al conjunto de fotos
-
-    # Alumnos con fotos seran aquellos cuya clave se encuentre dentro del conjunto de fotos
-    dfAlumnosConFoto = dfAlumnosNuevos[dfAlumnosNuevos["Clave"].astype(str).isin(fotos_set)]
-
+        
+def limpiarDatos(dfAlumnos):
+    
     # Verificar que el alumno tenga apellido paterno
     # Verificar que la longitud del nombre sea <= 45 caracteres
-    for _, registro in dfAlumnosConFoto.iterrows():
+    for _, registro in dfAlumnos.iterrows():
         if not isinstance(registro["Paterno"], str):
             registro["Paterno"] = registro["Materno"]
             registro["Materno"] = ""
@@ -51,7 +15,7 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
             print(f"El alumno {registro['Paterno']} {registro['Materno']} {registro['Nombre']} tiene un nombre demasiado largo")
 
     # Todo a mayusculas
-    dfAlumnosConFoto = dfAlumnosConFoto.apply(lambda x: x.map(lambda val: val.upper() if isinstance(val, str) else val))
+    dfAlumnos = dfAlumnos.apply(lambda x: x.map(lambda val: val.upper() if isinstance(val, str) else val))
 
     # Quitar caracteres especiales
     def quitar_caracteres(txt):
@@ -60,13 +24,13 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         return txt
 
     for columna in ["Paterno", "Materno", "Nombre"]:
-        dfAlumnosConFoto[columna] = dfAlumnosConFoto[columna].apply(lambda x: quitar_caracteres(str(x)) if isinstance(x, str) else x)
+        dfAlumnos[columna] = dfAlumnos[columna].apply(lambda x: quitar_caracteres(str(x)) if isinstance(x, str) else x)
 
     # Arreglar el sexo
-    dfAlumnosConFoto["Sexo"] = dfAlumnosConFoto["Sexo"].replace({"M": "H", "F": "M"})
+    dfAlumnos["Sexo"] = dfAlumnos["Sexo"].replace({"M": "H", "F": "M"})
 
     # Verificar fecha de nacimiento igual a RFC
-    for i, registro in dfAlumnosConFoto.iterrows():
+    for i, registro in dfAlumnos.iterrows():
         fecha_nac = str(registro["Fecha de Nacimiento"])
         rfc = str(registro["RFC"])
 
@@ -86,45 +50,63 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
 
                 if fecha_nac.isdigit(): #Si la fecha de nacimiento contiene solo numeros se puede corregir
                     print(f"LA FECHA CORREGIDA ES {fecha_nac}\n")
-                    dfAlumnosConFoto.at[i, "Fecha de Nacimiento"] = int(fecha_nac) #Y Asignar la fecha corregida al DataFrame
+                    dfAlumnos.at[i, "Fecha de Nacimiento"] = int(fecha_nac) #Y Asignar la fecha corregida al DataFrame
                 else:  # Si no son puros numeros, y contiene letras, hay que corregir manualmente los datos del alumno
                     print("EL RFC contiene errores de captura\nVerificar manualmente los datos del alumno\n")
-            
-    # Preparar el DataFrame que creará el Excel con el formato solicitado por Santander
-    borrador_pedido = pd.DataFrame(
-        columns=[
-            "APELLIDO P",
-            "APELLIDO M",
-            "NOMBRE",
-            "SEXO",
-            "FEC NACIMI",
-            "RFC",
-            "MATRICULA",
-            "CONDICION",
-            "CAMPUS",
-            "DEPAR",
-            "MOVIMIENTO",
-            "DATO ADICIONAL 1",
-            "DATO ADICIONAL 2",
-            "MODIFICACION EN NOMBRE",
-            "Codigo NACIONALIDAD",
-            "TELEFONO",
-            "E-MAIL",
-            "NOMBRE DE VIA (CALLE)",
-            "NUM DE VIA",
-            "INTERIOR",
-            "COLONIA",
-            "CP",
-            "PAIS",
-            "POBLACION",
-            "ESTADO",
-            "COD PROV",
-            "DEL/MUN",
-            "Nacionalidad",
-            "Pais de residencia",
-        ]
-    )
 
+    return dfAlumnos
+
+def procesarArchivos(rutaAlumnosActivos, rutaTodos, rutaFotos, rutaPdf = None):
+
+    dfAlumnosIntranet = pd.read_excel(rutaAlumnosActivos, usecols=["Paterno","Materno","Nombre","Clave","Sexo","Fecha de Nacimiento","RFC","Carrera","Nacionalidad","Plantel"],dtype=str)
+    dfTodos = pd.read_excel(rutaTodos, usecols=["Clave"])
+
+    # Alumnos nuevos seran aquellos activos cuya clave no esté en la BD de Todos
+    dfAlumnosNuevos = dfAlumnosIntranet[~dfAlumnosIntranet["Clave"].isin(dfTodos["Clave"])]
+
+    dfAlumnosNuevos = dfAlumnosNuevos[
+        ~(dfAlumnosNuevos["Carrera"].isin(["BACHILLERATO TECNOLOGICO DE LA UNIVERSIDAD IUEM", "PREPARATORIA UAEM", "PREPARATORIA SE"])) 
+        &
+        (dfAlumnosNuevos["Plantel"].isin(["IUEM", "ONLINE", "TENANCINGO", "UNIVERSIDAD IUEM"]))  
+    ]
+
+    # Conjunto que contendrá todas las fotos dentro de la carpeta mencionada arriba
+    #fotos_set = set()
+    global fotos_set
+    for foto in os.listdir(rutaFotos):
+        nombre, _ = os.path.splitext(foto)
+        fotos_set.add(nombre)  # Añadelo al conjunto de fotos
+
+    # Alumnos con fotos seran aquellos cuya clave se encuentre dentro del conjunto de fotos
+    dfAlumnosConFoto = dfAlumnosNuevos[dfAlumnosNuevos["Clave"].astype(str).isin(fotos_set)]
+    
+    #Si se proporcionó un PDF con las claves de los alumnos que pagaron reposición ..
+    if rutaPdf is not None:
+        clavesRepo = []
+        with pdfplumber.open(rutaPdf) as pdf:
+            for page in pdf.pages:
+                text = page.extract_table()
+                for i,row in enumerate(text):
+                    if i > 0:
+                        clavesRepo.append(row[3])
+        dfAlumnosRepo = dfAlumnosNuevos[dfAlumnosNuevos['Clave'].isin(clavesRepo)]
+        
+        dfAlumnosRepo = limpiarDatos(dfAlumnosRepo)
+        dfAlumnosConFoto = limpiarDatos(dfAlumnosConFoto)
+        
+        dfAlumnosRepo = crearBorrador(dfAlumnosRepo, "R")
+        dfAlumnosConFoto = crearBorrador(dfAlumnosConFoto, "A")
+        
+        borrador_pedido = pd.concat([dfAlumnosConFoto, dfAlumnosRepo], ignore_index=True)
+    else:
+        dfAlumnosConFoto = limpiarDatos(dfAlumnosConFoto)
+        dfAlumnosConFoto = crearBorrador(dfAlumnosConFoto, "A")
+        borrador_pedido = dfAlumnosConFoto
+    
+    return borrador_pedido
+
+def crearBorrador(dfAlumnos, movimiento):            
+    
     # Obtener la condición, plantel y departamento del alumno, recibe como parámetro el nombre de la carrera del alumno
     def get_condicion(carrera):
         # Primero, quita todos los caracteres especiales y carreras con "A" p.e. "Arqitectura A", para que solo sea "Arquitectura"
@@ -196,52 +178,48 @@ def ProcesarArchivos(AlumnosActivos, Todos, rutaFotos):
         return condicion, depto
         # Para poder asignarlos a cada registro
 
-    # Por caaada registro dentro de dfAlumnosConFoto ...
-    for i, valor in dfAlumnosConFoto.iterrows():
+    COLUMNAS_BORRADOR = [
+    "APELLIDO P", "APELLIDO M", "NOMBRE", "SEXO", "FEC NACIMI", "RFC", "MATRICULA",
+    "CONDICION", "CAMPUS", "DEPAR", "MOVIMIENTO", "DATO ADICIONAL 1", "DATO ADICIONAL 2",
+    "MODIFICACION EN NOMBRE", "Codigo NACIONALIDAD", "TELEFONO", "E-MAIL",
+    "NOMBRE DE VIA (CALLE)", "NUM DE VIA", "INTERIOR", "COLONIA", "CP", "PAIS",
+    "POBLACION", "ESTADO", "COD PROV", "DEL/MUN", "Nacionalidad", "Pais de residencia"
+    ]
+    
+    dfTemp = pd.DataFrame(index=dfAlumnos.copy().index, columns=COLUMNAS_BORRADOR)
+    
+    dfTemp["APELLIDO P"] = dfAlumnos["Paterno"]
+    dfTemp["APELLIDO M"] = dfAlumnos["Materno"]
+    dfTemp["NOMBRE"] = dfAlumnos["Nombre"]
+    dfTemp["SEXO"] = dfAlumnos["Sexo"]
+    dfTemp["FEC NACIMI"] = dfAlumnos["Fecha de Nacimiento"]
+    dfTemp["RFC"] = dfAlumnos["RFC"]
+    dfTemp["MATRICULA"] = dfAlumnos["Clave"]
+    
+    dfTemp["MOVIMIENTO"] = movimiento
+    
+    dfTemp[["CONDICION", "DEPAR"]] = dfAlumnos["Carrera"].apply(lambda x: pd.Series(get_condicion(x)))
 
-        # Estos primeros valores son los que arreglamos o que ya teníamos al principio
-        borrador_pedido.at[i, "APELLIDO P"] = valor["Paterno"]
-        borrador_pedido.at[i, "APELLIDO M"] = valor["Materno"]
-        borrador_pedido.at[i, "NOMBRE"] = valor["Nombre"]
-        borrador_pedido.at[i, "SEXO"] = valor["Sexo"]
-        borrador_pedido.at[i, "FEC NACIMI"] = valor["Fecha de Nacimiento"]
-        borrador_pedido.at[i, "RFC"] = valor["RFC"]
-        borrador_pedido.at[i, "MATRICULA"] = valor["Clave"]
-
-        # Llamada a la función get_condicion()
-        borrador_pedido.at[i, "CONDICION"], borrador_pedido.at[i, "DEPAR"] = get_condicion(valor["Carrera"])
-
-        borrador_pedido.at[i, "CAMPUS"] = "04" # El campus es siempre "04"
-        borrador_pedido.at[i, "MOVIMIENTO"] = "A"  # Todos los alumnos de "Alta" se harán en automatico
-        borrador_pedido.at[i, "DATO ADICIONAL 1"] = ""
-        borrador_pedido.at[i, "DATO ADICIONAL 2"] = ""
-        borrador_pedido.at[i, "MODIFICACION EN NOMBRE"] = "NO"  # Al ser alta, no requiere cambio de nombre
-
-        if (valor["Nacionalidad"]) != "MEXICANA":  # Si la nacionalidad no es mexicana ...
-            print(f"ADVERTENCIA \nEl alumno {valor['Clave']} no es de nacionalidad mexicana, ajustar manualmente")  # Ajustar manualmente
-            borrador_pedido.at[i, "Codigo NACIONALIDAD"] = ""  # Dejar en blanco el código de nacionalidad
-            borrador_pedido.at[i, "Nacionalidad"] = ""  # Dejar en blanco la nacionalidad
-            borrador_pedido.at[i, "PAIS"] = ""  # Dejar en blanco el país
-        else:
-            borrador_pedido.at[i, "Codigo NACIONALIDAD"] = "052"
-            borrador_pedido.at[i, "Nacionalidad"] = "MEXICO"
-            borrador_pedido.at[i, "PAIS"] = "052"
-
-        # Todos los demas son datos predeterminados
-        borrador_pedido.at[i, "TELEFONO"] = "7222624817"
-        borrador_pedido.at[i, "E-MAIL"] = "telecom@universidadiuem.edu.mx"
-        borrador_pedido.at[i, "NOMBRE DE VIA (CALLE)"] = "BOULEVARD TOLUCA METEPEC NORTE"
-        borrador_pedido.at[i, "NUM DE VIA"] = "814"
-        borrador_pedido.at[i, "INTERIOR"] = ""
-        borrador_pedido.at[i, "COLONIA"] = "HIPICO"
-        borrador_pedido.at[i, "CP"] = "52156"
-        borrador_pedido.at[i, "POBLACION"] = "METEPEC"
-        borrador_pedido.at[i, "ESTADO"] = "0000008MC"
-        borrador_pedido.at[i, "COD PROV"] = "00054"
-        borrador_pedido.at[i, "DEL/MUN"] = "METEPEC"
-        borrador_pedido.at[i, "Pais de residencia"] = "MEXICO"
-
-    return borrador_pedido
+    esmexicano = dfAlumnos["Nacionalidad"] == "MEXICANA"
+    dfTemp["Codigo NACIONALIDAD"] = np.where(esmexicano, "052", "")
+    dfTemp["Nacionalidad"] = np.where(esmexicano, "052", "")
+    dfTemp["PAIS"] = np.where(esmexicano, "052", "")
+    
+    dfTemp["CAMPUS"] = "04"
+    dfTemp["MODIFICACION EN NOMBRE"] = "NO"
+    dfTemp["TELEFONO"] = "7222624817"
+    dfTemp["E-MAIL"] = "telecom@universidadiuem.edu.mx"
+    dfTemp["NOMBRE DE VIA (CALLE)"] = "BOULEVARD TOLUCA METEPEC NORTE"
+    dfTemp["NUM DE VIA"] = "814"
+    dfTemp["COLONIA"] = "HIPICO"
+    dfTemp["CP"] = "52156"
+    dfTemp["POBLACION"] = "METEPEC"
+    dfTemp["ESTADO"] = "0000008MC"
+    dfTemp["COD PROV"] = "00054"
+    dfTemp["DEL/MUN"] = "METEPEC"
+    dfTemp["Pais de residencia"] = "MEXICO"
+    
+    return dfTemp
 
 # Genera un zip con las fotos redimensionadas EN 182x230px y las guarda en la misma ruta que la carpeta de fotos
 def genZip(rutaExcel, rutaFotos, fecha, borrador_pedido):
@@ -258,3 +236,4 @@ def genZip(rutaExcel, rutaFotos, fecha, borrador_pedido):
                     zipf.write(rutaImg, foto)
                 else:
                     print(f"La foto {foto} no se incluyó en el zip.")
+                    
