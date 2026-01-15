@@ -1,158 +1,233 @@
-import tkinter as tk, os
+import tkinter as tk
 from tkinter import filedialog, messagebox
+import os
 from datetime import datetime
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
-from procesamiento import procesarDatosDocentes,genZip
+from procesamiento import procesarDatosDocentes, genZip
 
 borrador_pedido = None
 
-class App:
-    def __init__(self, master):
+def detectar_tema_sistema():
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+        valor, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+        if valor == 0:
+            return "darkly" # Tema oscuro
+        else:
+            return "lumen" # Tema claro
+    except Exception:
+        return "lumen" # Si falla, por defecto claro
 
-        print(f"En esta ventana se mostrarán los posibles errores\nY advertencias que se encuentren en los datos de los docentes\n")
-        self.master = master
-        master.title("Preparación de Credenciales de Docentes")
-        master.geometry("450x500")
-        master.configure(bg="#f0f0f0")
-
-        titulo = tk.Label(master, text="Preparación de Credenciales Docentes", font=("Segoe UI", 16, "bold"), bg="#f0f0f0")
-        titulo.grid(row=0, column=0, columnspan=3, pady=(10, 20))
+class App(ttk.Window):
+    def __init__(self, tema_detectado):
+        super().__init__(themename=tema_detectado)
+        
+        self.title("Gestor de Credenciales Docentes")
+        self.geometry("750x780")
 
         self.archivos_cargados = {
             "dfDocentesIntranet": None,
             "dfTodos": None,
             "ruta_fotos": None
         }
+        self.widgets_estado = {}
 
-        self.labels_estado = {}
+        # --- CABECERA ---
+        header_frame = ttk.Frame(self, padding=20)
+        header_frame.pack(fill=X)
+        
+        
+        lbl_titulo = ttk.Label(header_frame, text="PREPARACIÓN DE CREDENCIALES DOCENTES", font=("Helvetica", 18, "bold"), bootstyle="sucess")
+        lbl_titulo.pack(pady=5)
 
-        self.crear_apartado("Archivo de Docentes Nuevos", "dfDocentesIntranet", 1)
-        self.crear_apartado("Archivo de Todos", "dfTodos", 3)
-        self.crear_apartado("Carpeta de fotos recibidas", "ruta_fotos", 5)
+        # --- ARCHIVOS ---
+        files_frame = ttk.Labelframe(self, text="  Archivos Requeridos  ", padding=15, bootstyle="info")
+        files_frame.pack(fill=X, padx=20, pady=10)
 
-        estilo_boton = {"font": ("Segoe UI", 10), "bg": "#ff6961", "fg": "black", "activebackground": "#45a049"}
+        self.crear_input(files_frame, "1. Docentes Nuevos (Intranet):", "dfDocentesIntranet", 0)
+        self.crear_input(files_frame, "2. Base de Datos Completa:", "dfTodos", 1)
+        self.crear_input(files_frame, "3. Carpeta de Fotos:", "ruta_fotos", 2, es_carpeta=True)
 
-        #Boton para procesar los datos
-        self.boton_procesar = tk.Button(master, text="Procesar", state=tk.DISABLED, command=self.procesar, **estilo_boton)
-        self.boton_procesar.grid(row=7, column=0, columnspan=3, pady=(35, 20), ipadx=17, ipady=5)
+        # --- ACCIONES ---
+        action_frame = ttk.Frame(self, padding=20)
+        action_frame.pack(fill=BOTH, expand=YES)
 
-        #Label para mostrar el resultado del procesamiento
-        self.lbl_resultado = tk.Label(master, text="", font=("Segoe UI", 10), bg="#f0f0f0")
-        self.lbl_resultado.grid(row=8, column=0, columnspan=3, pady=(5, 10))
+        # BOTÓN PROCESAR
+        self.btn_procesar = ttk.Button(
+            action_frame, 
+            text="PROCESAR DATOS", 
+            command=self.procesar, 
+            state=DISABLED, 
+            bootstyle="primary", 
+            width=25
+        )
+        self.btn_procesar.pack(pady=10)
 
-        #Boton para generar el archivo de Excel
-        self.btn_generar_excel = tk.Button(master, text="Generar Excel", state=tk.DISABLED, command=self.generar_excel, **estilo_boton)
-        self.btn_generar_excel.grid(row=9, column=0, columnspan=3, pady=(5, 20), ipadx=10, ipady=5)
-    
-    def crear_apartado(self, texto, clave, fila):
+        self.lbl_resultado = ttk.Label(action_frame, text="Esperando archivos...", font=("Helvetica", 10), bootstyle="secondary")
+        self.lbl_resultado.pack(pady=5)
 
-        #Label del tipo de archivo
-        label = tk.Label(self.master, text=texto + ":", font=("Segoe UI", 10), bg="#f0f0f0")
-        label.grid(row=fila, column=0, sticky="w", padx=20)
+        ttk.Separator(action_frame, orient=HORIZONTAL).pack(fill=X, pady=15)
 
-        #Botón para seleccionar el archivo o carpeta
-        boton = tk.Button(self.master, text="Seleccionar", command=lambda: self.seleccionar_archivo(clave), font=("Segoe UI", 9))
-        boton.grid(row=fila, column=1, padx=10)
+        # BOTÓN GENERAR
+        self.btn_generar = ttk.Button(
+            action_frame, 
+            text="GENERAR EXCEL Y ZIP", 
+            command=self.generar_excel, 
+            state=DISABLED, 
+            bootstyle="success", 
+            width=25
+        )
+        self.btn_generar.pack(pady=10)
 
-        #Label para mostrar el estado del archivo o carpeta
-        estado = tk.Label(self.master, text="⛔ No cargado", font=("Segoe UI", 9), bg="#f0f0f0", fg="red")
-        estado.grid(row=fila, column=2, sticky="w")
+    def crear_input(self, parent, texto, clave, fila, es_carpeta=False):
+        frame = ttk.Frame(parent)
+        frame.pack(fill=X, pady=8)
 
-        # Label para mostrar solo el nombre del archivo
-        nombre_archivo = tk.Label(self.master, text="", font=("Segoe UI", 8), bg="#f0f0f0", fg="gray")
-        nombre_archivo.grid(row=fila + 1, column=0, columnspan=3, sticky="w", padx=20)
+        ttk.Label(frame, text=texto, font=("Helvetica", 9, "bold")).pack(anchor=W)
 
-        self.labels_estado[clave] = estado
-        self.labels_estado[f"{clave}_nombre"] = nombre_archivo
+        input_box = ttk.Frame(frame)
+        input_box.pack(fill=X, pady=2)
 
-    def seleccionar_archivo(self, clave):
-        if clave == "ruta_fotos":
+        entry_var = tk.StringVar()
+        entry = ttk.Entry(input_box, textvariable=entry_var, state="readonly")
+        entry.pack(side=LEFT, fill=X, expand=YES, padx=(0, 10))
+        self.widgets_estado[f"{clave}_entry"] = entry_var
+        btn = ttk.Button(
+            input_box, 
+            text="Examinar", 
+            command=lambda: self.seleccionar_archivo(clave, es_carpeta),
+            bootstyle="primary"
+        )
+        btn.pack(side=RIGHT)
+
+        lbl_status = ttk.Label(frame, text="Pendiente", font=("Arial", 9), bootstyle="danger")
+        lbl_status.pack(anchor=W)
+        self.widgets_estado[f"{clave}_status"] = lbl_status
+
+
+    def seleccionar_archivo(self, clave, es_carpeta):
+        if es_carpeta:
             ruta = filedialog.askdirectory(title="Selecciona la carpeta de fotos")
         else:
             ruta = filedialog.askopenfilename(filetypes=[("Archivos Excel", "*.xlsx")])
+        
         if ruta:
             self.archivos_cargados[clave] = ruta
-            self.labels_estado[clave].config(text="✅ Archivo cargado", fg="green")
             nombre_archivo = os.path.basename(ruta)
-            self.labels_estado[f"{clave}_nombre"].config(text=f"Has seleccionado: {nombre_archivo}")
+            self.widgets_estado[f"{clave}_entry"].set(ruta)
+            
+            lbl = self.widgets_estado[f"{clave}_status"]
+            lbl.config(text=f"✅ Listo: {nombre_archivo}", bootstyle="success")
+            
             self.verificar_todo_cargado()
+
 
     def verificar_todo_cargado(self):
         if all(self.archivos_cargados.values()):
-            estilo_boton = {"font": ("Segoe UI", 10), "bg": "#00913f", "fg": "white", "activebackground": "#114232", "state": "normal"}
-            self.boton_procesar.config(**estilo_boton)
+            self.btn_procesar.config(state=NORMAL)
+            self.lbl_resultado.config(text="Archivos listos. Presiona 'Procesar'.", bootstyle="primary")
+
 
     def procesar(self):
-        dfDocentesIntranet_path = self.archivos_cargados["dfDocentesIntranet"]
-        dfTodos_path = self.archivos_cargados["dfTodos"]
-        ruta = self.archivos_cargados["ruta_fotos"]
+        self.btn_procesar.config(state=DISABLED, text="Procesando...")
+        self.update()
 
-        global borrador_pedido
-        borrador_pedido = procesarDatosDocentes(dfDocentesIntranet_path, dfTodos_path, ruta)
+        try:
+            dfIntranet = self.archivos_cargados["dfDocentesIntranet"]
+            dfTodos = self.archivos_cargados["dfTodos"]
+            fotos = self.archivos_cargados["ruta_fotos"]
 
-        if (borrador_pedido is not None) and (len(borrador_pedido) >= 1):
-            estilo_boton = {"font": ("Segoe UI", 10), "bg": "#00913f", "fg": "white", "activebackground": "#114232", "state": "normal"}
-            self.lbl_resultado.config(text=f"Procesamiento completo: \n{len(borrador_pedido)} registros creados", fg="green")
-            self.btn_generar_excel.config(**estilo_boton)
-        else:
-            messagebox.showerror("Error", "No se generó ningún resultado.")
+            global borrador_pedido
+            borrador_pedido = procesarDatosDocentes(dfIntranet, dfTodos, fotos)
+
+            if (borrador_pedido is not None) and (len(borrador_pedido) >= 1):
+                msg = f"¡Éxito! Se generaron {len(borrador_pedido)} registros."
+                self.lbl_resultado.config(text=msg, bootstyle="success")
+                self.btn_generar.config(state=NORMAL)
+                messagebox.showinfo("Proceso Completo", msg)
+            else:
+                self.lbl_resultado.config(text="No se encontraron registros.", bootstyle="warning")
+                messagebox.showwarning("Atención", "El procesamiento no generó datos nuevos.")
+
+        except Exception as e:
+            messagebox.showerror("Error Crítico", f"Ocurrió un error:\n{str(e)}")
+            self.lbl_resultado.config(text="Error en el proceso", bootstyle="danger")
+        
+        finally:
+            self.btn_procesar.config(state=NORMAL, text="PROCESAR DATOS")
+
 
     def generar_excel(self):
-        #Generar el archivo de Excel para hacer el pedido de credenciales
-        fecha = datetime.today().strftime('%Y %m %d') #Obtenemos la fecha del dia de hoy en formato AAAA MM DD
-        nombre_excel = f"Pedido DOC {fecha}.xlsx"
+        fecha = datetime.today().strftime('%Y %m %d')
+        nombre_defecto = f"Pedido DOC {fecha}.xlsx"
         
         archivo_excel = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
             filetypes=[("Excel files", "*.xlsx")],
-            initialfile=nombre_excel,
-            title="Guardar archivo como ..."
+            initialfile=nombre_defecto,
+            title="Guardar Pedido y Zip"
         )
-        #print(archivo_excel)
-        if archivo_excel:
+
+        if not archivo_excel:
+            return
+
+        try:
+            self.btn_generar.config(text="Generando...", state=DISABLED)
+            self.update()
+
+            genZip(archivo_excel, self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido)
+            borrador_pedido.to_excel(archivo_excel, index=False, engine="openpyxl")
             
-            #genZip(self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) #Genera el zip con las fotos redimensionadas
-            genZip(archivo_excel, self.archivos_cargados["ruta_fotos"], fecha, borrador_pedido) #Genera el zip con las fotos redimensionadas
+            self.aplicar_estilos_excel(archivo_excel)
 
-            #Convertir el borrado en un excel
-            borrador_pedido.to_excel(archivo_excel,index=False, engine="openpyxl")
+            messagebox.showinfo("Éxito Total", f"Archivos generados correctamente en:\n{os.path.dirname(archivo_excel)}")
+            self.lbl_resultado.config(text="Ciclo finalizado correctamente.", bootstyle="success")
 
-            #A partir de aqui son simples estilos, pero que calzan con el formato de Excel de pedidos anteriores
-            #Generado con IA
-            wb = load_workbook(archivo_excel)
-            ws = wb.active
-            # Definir estilo del encabezado
-            header_font = Font(color="FFFFFF", bold=True)  # Blanco y negrita
-            header_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")  # Rojo
-            # Aplicar estilo al encabezado
-            for cell in ws[1]:  # Primera fila (encabezado)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = Alignment(vertical="center")
-            # Ajustar altura del encabezado
-            ws.row_dimensions[1].height = 36
-            left_align = Alignment(horizontal="left", vertical="center")
-            center_align = Alignment(horizontal="center", vertical="center")
-            for i,column in enumerate(ws.columns, start=1):
-                max_length = 0
-                column_letter = column[0].column_letter  # Obtener la letra de la columna
-                align = left_align if i <= 3 else center_align
-                for cell in column:
-                    try:
-                        if cell.value:
-                            max_length = max(max_length, len(str(cell.value)))
-                            cell.alignment = align
-                    except:
-                        pass
-                ws.column_dimensions[column_letter].width = max_length + 2
-            # Guardar cambios y geberar el Excel
-            wb.save(archivo_excel)
-            messagebox.showinfo("Éxito", "Archivo Excel guardado correctamente.\n\nEl archivo .zip con las fotos \nse ha guardado en el mismo lugar.")
-        else:
-            messagebox.showwarning("Advertencia", "No has guardado el archivo")
+        except Exception as e:
+            messagebox.showerror("Error al Guardar", f"No se pudo guardar el archivo:\n{e}")
+        finally:
+             self.btn_generar.config(text="GENERAR EXCEL Y ZIP", state=NORMAL)
+
+
+    def aplicar_estilos_excel(self, ruta_archivo):
+        wb = load_workbook(ruta_archivo)
+        ws = wb.active
+
+        header_font = Font(color="FFFFFF", bold=True)
+        header_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+        
+        for cell in ws[1]:
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(vertical="center")
+        
+        ws.row_dimensions[1].height = 36
+        
+        left_align = Alignment(horizontal="left", vertical="center")
+        center_align = Alignment(horizontal="center", vertical="center")
+        
+        for i, column in enumerate(ws.columns, start=1):
+            max_length = 0
+            column_letter = column[0].column_letter
+            align = left_align if i <= 3 else center_align
+            
+            for cell in column:
+                try:
+                    if cell.value:
+                        largo = len(str(cell.value))
+                        if largo > max_length: max_length = largo
+                        cell.alignment = align
+                except: pass
+            ws.column_dimensions[column_letter].width = max_length + 2
+            
+        wb.save(ruta_archivo)
+
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
+    tema_elegido = detectar_tema_sistema()
+    app = App(tema_elegido)
+    app.mainloop()

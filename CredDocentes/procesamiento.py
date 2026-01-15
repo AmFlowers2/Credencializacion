@@ -107,7 +107,7 @@ def procesarDatosDocentes(ProfesoresNuevos, Todos, rutaFotos):
         borrador_pedido.at[i, "MODIFICACION EN NOMBRE"] = "NO" #Al ser alta, no requiere cambio de nombre
 
         if (valor["Nacionalidad"]) != "MEXICANA": #Si la nacionalidad no es mexicana ...
-            print(f"ADVERTENCIA \nEl docente {valor['Clave']} no es de nacionalidad mexicana, ajustar manualmente") 
+            print(f"ADVERTENCIA \nEl docente {valor['clave']} no es de nacionalidad mexicana, ajustar manualmente") 
             #Ajustar manualmente los datos de nacionalidad, en el Excel se deja en blanco
             borrador_pedido.at[i, "Codigo NACIONALIDAD"] = ""
             borrador_pedido.at[i, "Nacionalidad"] = ""
